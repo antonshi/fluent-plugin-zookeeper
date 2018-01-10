@@ -55,4 +55,4 @@ Configuration above uses in_exec plugin as a heartbeat message generator. During
 
 ## TODO
 
-Write tests.
+Let me know if support for buffered output mode and older versions of fluentd is necessary.
