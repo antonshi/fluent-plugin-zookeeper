@@ -99,12 +99,12 @@ DESC
           es.each do |time, record|
             begin
               data = @formatter_proc.call(record)
-              if @ignore_empty_msg && data == "{}"
-                log.debug "Skipping empty record"
-                next
-              end
             rescue StandardError => e
               log.warn "Failed to format record:", :error => e.to_s, :record => record
+              next
+            end
+            if @ignore_empty_msg && data == "{}"
+              log.debug "Skipping empty record"
               next
             end
             @zk.set({path: @path, data: data})
