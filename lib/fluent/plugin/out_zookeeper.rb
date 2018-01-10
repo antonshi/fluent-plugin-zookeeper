@@ -104,7 +104,7 @@ DESC
                 next
               end
             rescue StandardError => e
-              log.warn "Failed to format record:", :record => record
+              log.warn "Failed to format record:", :error => e.to_s, :record => record
               next
             end
             @zk.set({path: @path, data: data})
