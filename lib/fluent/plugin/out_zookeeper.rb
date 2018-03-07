@@ -39,19 +39,29 @@ DESC
       end
 
       def init_client(raise_exception = true)
+        log.info "Initializing connection to Zookeeper"
         begin
-          @zk = Zookeeper.new(@servers)
-
-          case @type
-          when 'ephemeral'
-            @zk.create({path: @path, ephemeral: true})
-          when 'sequence'
-            @zk.create({path: @path, sequence: true})
+          if @zk.nil?
+            @zk = Zookeeper.new(@servers)
           else
-            # persistent (or anything else)
-            @zk.create({path: @path})
+            @zk.reopen
           end
-          log.info "Connection to Zookeeper service [#@servers] has been initialized"
+
+          if @zk.connected?
+            case @type
+            when 'ephemeral'
+              @zk.create({path: @path, ephemeral: true})
+            when 'sequence'
+              @zk.create({path: @path, sequence: true})
+            else
+              # persistent (or anything else)
+              @zk.create({path: @path})
+            end
+            log.info "Connection to Zookeeper service [#@servers] has been initialized"
+            @con_lost_msg = "Connection to Zookeeper was lost"
+          else
+            log.warn "Cannot establish connection to Zookeeper"
+          end
         rescue Exception => e
           if raise_exception
             raise e
@@ -91,27 +101,35 @@ DESC
       end
 
       def process(tag, es)
-        if !@zk.connected?
-          init_client(false)
-        end
-
-        begin
-          es.each do |time, record|
-            begin
-              data = @formatter_proc.call(record)
-            rescue StandardError => e
-              log.warn "Failed to format record:", :error => e.to_s, :record => record
-              next
+        if @zk.connected?
+          begin
+            es.each do |time, record|
+              begin
+                data = @formatter_proc.call(record)
+              rescue StandardError => e
+                log.warn "Failed to format record:", :error => e.to_s, :record => record
+                next
+              end
+              if @ignore_empty_msg && data == "{}"
+                log.debug "Skipping empty record"
+                next
+              end
+              @zk.set({path: @path, data: data})
             end
-            if @ignore_empty_msg && data == "{}"
-              log.debug "Skipping empty record"
-              next
-            end
-            @zk.set({path: @path, data: data})
+          rescue Exception => e
+            log.error "Exception occurred while sending data: #{e}"
+            # Connection will be reinitialized on next call
+            @zk.close
           end
-        rescue Exception => e
-          log.warn "Exception occurred while sending data: #{e}"
-          raise e
+        elsif !@zk.connecting?
+          # We are not connected and not connecting; it's time to reinit the client
+          @zk.close if !@zk.closed?
+          init_client(false)
+        else
+          if !@con_lost_msg.nil?
+            log.warn "#@con_lost_msg"
+            @con_lost_msg = nil
+          end
         end
       end
     end
