@@ -3,7 +3,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |spec|
   spec.name    = "fluent-plugin-zookeeper"
-  spec.version = "0.1.1"
+  spec.version = "0.1.2"
   spec.authors = ["Anton Tikhomirov"]
   spec.email   = ["anton.tikhomirov@cdnetworks.com"]
 
